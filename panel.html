@@ -85,10 +85,9 @@
       </div>
     </div>
 
-    <!-- Karty Podsumowania (Koszty PLN, EUR i Pojazdy z PLN/km) -->
+    <!-- Karty Podsumowania -->
     <div id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       
-      <!-- Suma Wydatków PLN -->
       <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
         <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (PLN)</p>
         <p id="kpiTotalPLN" class="text-2xl font-black text-slate-900 dark:text-white mt-1">0.00 PLN</p>
@@ -98,7 +97,6 @@
         </div>
       </div>
 
-      <!-- Suma Wydatków EUR -->
       <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
         <div class="flex justify-between items-start">
           <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (EUR)</p>
@@ -111,8 +109,6 @@
         <span id="kpiEurInPlnDetails" class="text-xs text-slate-500 dark:text-slate-400 mt-1 block">= 0.00 PLN po kursie</span>
       </div>
 
-      <!-- Dynamiie renderowane karty aut -->
-
     </div>
 
     <!-- Tabela Raportu Wydatków -->
@@ -120,7 +116,6 @@
       <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h2 class="font-bold text-slate-800 dark:text-slate-200 text-lg">📑 Zestawienie Wpisów i Tankowań</h2>
         
-        <!-- Filtry -->
         <div class="flex flex-wrap items-center gap-3 no-print w-full md:w-auto">
           <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
             <span>Od:</span>
@@ -131,7 +126,7 @@
             <input type="date" id="filterDateTo" onchange="renderTable()" class="p-1.5 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 focus:outline-none">
           </div>
           <select id="filterVehicle" onchange="renderTable()" class="text-xs p-2 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 font-semibold focus:outline-none">
-            <!-- Wypełniane dynamicznie -->
+            <!-- Dynamiczne -->
           </select>
         </div>
       </div>
@@ -161,7 +156,7 @@
 
   </div>
 
-  <!-- MODAL: Zarządzanie Flotą i Alertami Serwisowymi -->
+  <!-- MODAL: Zarządzanie Flotą -->
   <div id="addVehicleModal" class="fixed inset-0 bg-black/70 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
     <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3">
@@ -169,7 +164,6 @@
         <button type="button" onclick="closeAddVehicleModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
       </div>
 
-      <!-- Formularz Nowego Pojazdu z Ustawieniem Serwisu -->
       <form id="vehicleForm" onsubmit="saveNewVehicle(event)" class="space-y-3 bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
         <h4 class="font-bold text-xs uppercase text-slate-500 dark:text-slate-400 tracking-wider">Dodaj nowy pojazd</h4>
         <div>
@@ -189,11 +183,10 @@
         </button>
       </form>
 
-      <!-- Lista Obecnych Pojazdów -->
       <div class="space-y-2">
         <h4 class="font-bold text-xs uppercase text-slate-500 dark:text-slate-400 tracking-wider">Aktualne pojazdy we flocie</h4>
         <div id="modalVehicleList" class="space-y-2 max-h-48 overflow-y-auto">
-          <!-- Generowanie JS -->
+          <!-- Wpisów brak na start -->
         </div>
       </div>
 
@@ -231,11 +224,6 @@
     let globalExpenses = [];
     let fleetVehicles = [];
 
-    const defaultVehicles = [
-      { registration: 'LLE 44468', name: 'Audi A4 B6', nextService: 290000 },
-      { registration: 'LUB 6894R', name: 'Opel', nextService: 210000 }
-    ];
-
     function initTheme() {
       if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
@@ -258,10 +246,11 @@
       }
     }
 
+    // CZYSZCZENIE: Pusta lista domyślna
     function initVehicles() {
       const stored = localStorage.getItem('fleet_vehicles');
       if (!stored) {
-        fleetVehicles = defaultVehicles;
+        fleetVehicles = [];
         localStorage.setItem('fleet_vehicles', JSON.stringify(fleetVehicles));
       } else {
         fleetVehicles = JSON.parse(stored);
@@ -272,6 +261,10 @@
 
     function renderVehicleFilter() {
       const select = document.getElementById('filterVehicle');
+      if (fleetVehicles.length === 0) {
+        select.innerHTML = '<option value="ALL">Brak pojazdów</option>';
+        return;
+      }
       select.innerHTML = '<option value="ALL">Wszystkie pojazdy</option>' + 
         fleetVehicles.map(v => `<option value="${v.registration}">${v.name} (${v.registration})</option>`).join('');
     }
@@ -281,7 +274,7 @@
       if (!container) return;
 
       if (fleetVehicles.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400 py-2">Brak pojazdów we flocie.</p>';
+        container.innerHTML = '<p class="text-xs text-slate-400 py-2 text-center">Brak pojazdów we flocie. Dodaj pierwszy powyżej!</p>';
         return;
       }
 
@@ -300,11 +293,6 @@
     }
 
     function deleteVehicle(registration) {
-      if (fleetVehicles.length <= 1) {
-        alert("Flota musi posiadać co najmniej jeden pojazd.");
-        return;
-      }
-
       if (!confirm(`Czy na pewno chcesz usunąć pojazd ${registration} z floty?`)) return;
 
       fleetVehicles = fleetVehicles.filter(v => v.registration !== registration);
@@ -560,7 +548,6 @@
 
     function getVehicleStats(veh) {
       const regNumber = veh.registration;
-      
       const vExpenses = globalExpenses.filter(e => e.vehicle.includes(regNumber));
       
       const fuelEntries = vExpenses
