@@ -10,7 +10,7 @@
   </script>
   <style>
     @media print {
-      nav, button, label, select, input, #photoModal, #addVehicleModal, .no-print {
+      nav, button, label, select, input, #photoModal, #addVehicleModal, #editExpenseModal, .no-print {
         display: none !important;
       }
       body {
@@ -44,7 +44,7 @@
         <h1 class="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <span>📊</span> Panel Przewoźnika — Analiza Floty
         </h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Podsumowanie kosztów, koszty PLN/km oraz alerty serwisowe</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Podsumowanie kosztów, koszty PLN/km oraz edycja wpisów</p>
       </div>
 
       <!-- Akcje / Przyciski -->
@@ -85,30 +85,9 @@
       </div>
     </div>
 
-    <!-- Karty Podsumowania -->
+    <!-- Dynamiczne Karty Podsumowania (Suma Ogólna lub Wybrane Auto) -->
     <div id="kpiContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      
-      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (PLN)</p>
-        <p id="kpiTotalPLN" class="text-2xl font-black text-slate-900 dark:text-white mt-1">0.00 PLN</p>
-        <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs">
-          <span class="text-slate-500 dark:text-slate-400">Razem z EUR:</span>
-          <span id="kpiTotalConvertedPLN" class="font-bold text-emerald-600 dark:text-emerald-400">0.00 PLN</span>
-        </div>
-      </div>
-
-      <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-        <div class="flex justify-between items-start">
-          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (EUR)</p>
-          <div class="flex items-center gap-1 no-print">
-            <span class="text-[10px] text-slate-400 font-medium">Kurs:</span>
-            <input type="number" id="eurRate" step="0.01" value="4.25" onchange="processData()" class="w-14 p-1 text-xs border dark:border-slate-600 rounded font-bold text-blue-600 dark:bg-slate-700 dark:text-blue-400 text-center">
-          </div>
-        </div>
-        <p id="kpiTotalEUR" class="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">0.00 EUR</p>
-        <span id="kpiEurInPlnDetails" class="text-xs text-slate-500 dark:text-slate-400 mt-1 block">= 0.00 PLN po kursie</span>
-      </div>
-
+      <!-- Wypełniane dynamicznie przez JS w zależności od wybranego filtru -->
     </div>
 
     <!-- Tabela Raportu Wydatków -->
@@ -119,15 +98,18 @@
         <div class="flex flex-wrap items-center gap-3 no-print w-full md:w-auto">
           <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
             <span>Od:</span>
-            <input type="date" id="filterDateFrom" onchange="renderTable()" class="p-1.5 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 focus:outline-none">
+            <input type="date" id="filterDateFrom" onchange="processData()" class="p-1.5 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 focus:outline-none">
           </div>
           <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
             <span>Do:</span>
-            <input type="date" id="filterDateTo" onchange="renderTable()" class="p-1.5 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 focus:outline-none">
+            <input type="date" id="filterDateTo" onchange="processData()" class="p-1.5 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 focus:outline-none">
           </div>
-          <select id="filterVehicle" onchange="renderTable()" class="text-xs p-2 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 font-semibold focus:outline-none">
-            <!-- Dynamiczne -->
-          </select>
+          <div class="flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+            <span>Pojazd:</span>
+            <select id="filterVehicle" onchange="processData()" class="text-xs p-2 border dark:border-slate-600 rounded-xl bg-slate-50 dark:bg-slate-700 font-bold focus:outline-none text-blue-600 dark:text-blue-400">
+              <!-- Dynamiczne -->
+            </select>
+          </div>
         </div>
       </div>
 
@@ -142,7 +124,7 @@
               <th class="p-4">Stan Licznika</th>
               <th class="p-4">Kwota</th>
               <th class="p-4 text-center">Zdjęcie</th>
-              <th class="p-4 text-center no-print">Akcja</th>
+              <th class="p-4 text-center no-print">Akcje</th>
             </tr>
           </thead>
           <tbody id="expenseTableBody" class="divide-y divide-slate-100 dark:divide-slate-700 text-slate-700 dark:text-slate-300">
@@ -152,8 +134,90 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Pasek Podsumowania Filtrowanych Wydatków na dole tabeli -->
+      <div id="tableSummaryFooter" class="p-4 bg-slate-50 dark:bg-slate-700/30 border-t border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-200 gap-2">
+        <span id="filteredCount">Liczba wpisów: 0</span>
+        <div class="flex gap-4">
+          <span id="filteredLiters">Suma litrów: 0.00 L</span>
+          <span id="filteredTotalCost" class="text-sm text-blue-600 dark:text-blue-400">Suma: 0.00 PLN</span>
+        </div>
+      </div>
     </div>
 
+  </div>
+
+  <!-- MODAL: Edycja Wydatku -->
+  <div id="editExpenseModal" class="fixed inset-0 bg-black/70 hidden z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+      <div class="flex justify-between items-center border-b dark:border-slate-700 pb-3">
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <span>✏️</span> Edycja Wydatku
+        </h3>
+        <button type="button" onclick="closeEditExpenseModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
+      </div>
+
+      <form id="editExpenseForm" onsubmit="saveEditedExpense(event)" class="space-y-3">
+        <input type="hidden" id="editExpenseId">
+        
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Pojazd</label>
+          <select id="editVehicle" required class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-700 dark:border-slate-600 text-sm font-medium focus:outline-none">
+            <!-- Wypełniane dynamicznie -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Kategoria</label>
+            <select id="editCategory" class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-700 dark:border-slate-600 text-sm font-medium focus:outline-none">
+              <option value="Paliwo">Paliwo</option>
+              <option value="Opłata drogowa">e-TOLL / Autostrada</option>
+              <option value="Serwis">Serwis / Części</option>
+              <option value="Inne">Inne wydatki</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Data</label>
+            <input type="date" id="editDate" required class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-700 dark:border-slate-600 text-sm font-medium focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 bg-blue-50/50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800">
+          <div>
+            <label class="block text-xs font-bold text-blue-700 dark:text-blue-400 uppercase mb-1">Litry (L)</label>
+            <input type="number" step="0.01" id="editLiters" placeholder="np. 55.40" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded text-sm font-medium focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-blue-700 dark:text-blue-400 uppercase mb-1">Stan licznika (km)</label>
+            <input type="number" id="editMileage" placeholder="np. 284500" class="w-full p-2 border dark:border-slate-600 dark:bg-slate-700 rounded text-sm font-medium focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Kwota brutto</label>
+            <input type="number" step="0.01" id="editAmount" required class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-700 dark:border-slate-600 font-bold text-sm focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-1">Waluta</label>
+            <select id="editCurrency" class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-700 dark:border-slate-600 font-bold text-sm focus:outline-none">
+              <option value="PLN">PLN</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl shadow transition-all text-sm">
+            💾 Zapisz Zmiany
+          </button>
+          <button type="button" onclick="closeEditExpenseModal()" class="w-1/3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold py-2.5 rounded-xl text-sm transition-all">
+            Anuluj
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- MODAL: Zarządzanie Flotą -->
@@ -246,7 +310,6 @@
       }
     }
 
-    // CZYSZCZENIE: Pusta lista domyślna
     function initVehicles() {
       const stored = localStorage.getItem('fleet_vehicles');
       if (!stored) {
@@ -257,6 +320,7 @@
       }
       renderVehicleFilter();
       renderModalVehicleList();
+      populateEditVehicleDropdown();
     }
 
     function renderVehicleFilter() {
@@ -267,6 +331,18 @@
       }
       select.innerHTML = '<option value="ALL">Wszystkie pojazdy</option>' + 
         fleetVehicles.map(v => `<option value="${v.registration}">${v.name} (${v.registration})</option>`).join('');
+    }
+
+    function populateEditVehicleDropdown() {
+      const select = document.getElementById('editVehicle');
+      if (!select) return;
+      if (fleetVehicles.length === 0) {
+        select.innerHTML = '<option value="">Brak pojazdów - Dodaj we flocie</option>';
+        return;
+      }
+      select.innerHTML = fleetVehicles.map(v => `
+        <option value="${v.registration}">${v.name} (${v.registration})</option>
+      `).join('');
     }
 
     function renderModalVehicleList() {
@@ -333,46 +409,6 @@
       processData();
     }
 
-    function exportBackupJSON() {
-      const backupData = {
-        vehicles: fleetVehicles,
-        expenses: JSON.parse(localStorage.getItem('fleet_expenses') || '[]'),
-        exportDate: new Date().toISOString()
-      };
-
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `FleetLog_Kopia_${new Date().toISOString().slice(0,10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    }
-
-    function importBackupJSON(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const imported = JSON.parse(e.target.result);
-          if (imported.expenses && Array.isArray(imported.expenses)) {
-            localStorage.setItem('fleet_expenses', JSON.stringify(imported.expenses));
-          }
-          if (imported.vehicles && Array.isArray(imported.vehicles)) {
-            localStorage.setItem('fleet_vehicles', JSON.stringify(imported.vehicles));
-          }
-          alert("Kopia zapasowa została pomyślnie przywrócona!");
-          initVehicles();
-          loadFromLocalStorage();
-        } catch (err) {
-          alert("Nieprawidłowy plik kopii zapasowej JSON.");
-        }
-      };
-      reader.readAsText(file);
-    }
-
     function loadFromLocalStorage() {
       const storedExpenses = localStorage.getItem('fleet_expenses');
       if (!storedExpenses) {
@@ -387,9 +423,9 @@
         date: e.date,
         vehicle: e.vehicle || 'Inny',
         category: e.category,
-        amount: parseFloat(e.amount_gross) || 0,
+        amount: parseFloat(e.amount_gross || e.amount) || 0,
         currency: e.currency,
-        liters: parseFloat(e.fuel_liters) || null,
+        liters: parseFloat(e.fuel_liters || e.liters) || null,
         mileage: parseInt(e.mileage) || null,
         photo: e.photo || null,
         hasPhoto: e.photo ? true : false
@@ -398,83 +434,29 @@
       processData();
     }
 
-    function handleCSVImport(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const text = e.target.result;
-        const lines = text.split('\n');
-        
-        globalExpenses = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-
-          const cols = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
-
-          if (cols.length >= 5) {
-            globalExpenses.push({
-              id: Date.now() + i,
-              date: cols[0] || '',
-              vehicle: cols[1] || 'Inny',
-              category: cols[2] || '',
-              amount: parseFloat(cols[3]) || 0,
-              currency: cols[4] || 'PLN',
-              liters: parseFloat(cols[5]) || null,
-              mileage: parseInt(cols[6]) || null,
-              photo: null,
-              hasPhoto: cols[7] === 'TAK'
-            });
-          }
-        }
-
-        processData();
-      };
-      reader.readAsText(file);
-    }
-
     function processData() {
-      calculateTotals();
       renderVehicleCards();
       renderTable();
     }
 
-    function calculateTotals() {
-      let totalPLN = 0;
-      let totalEUR = 0;
-
-      globalExpenses.forEach(e => {
-        if (e.currency === 'EUR') {
-          totalEUR += e.amount;
-        } else {
-          totalPLN += e.amount;
-        }
-      });
-
-      const rate = parseFloat(document.getElementById('eurRate').value) || 4.25;
-      const eurInPln = totalEUR * rate;
-      const grandTotalPLN = totalPLN + eurInPln;
-
-      const elPLN = document.getElementById('kpiTotalPLN');
-      const elEUR = document.getElementById('kpiTotalEUR');
-      const elConv = document.getElementById('kpiTotalConvertedPLN');
-      const elEurDetails = document.getElementById('kpiEurInPlnDetails');
-
-      if (elPLN) elPLN.innerText = totalPLN.toFixed(2) + ' PLN';
-      if (elEUR) elEUR.innerText = totalEUR.toFixed(2) + ' EUR';
-      if (elConv) elConv.innerText = grandTotalPLN.toFixed(2) + ' PLN';
-      if (elEurDetails) elEurDetails.innerText = `= ${eurInPln.toFixed(2)} PLN (kurs ${rate})`;
-    }
-
+    // Dynamiczne przeliczanie kart podsumowania (Ogólnie lub wybrane auto)
     function renderVehicleCards() {
       const container = document.getElementById('kpiContainer');
-      
+      const selectedFilter = document.getElementById('filterVehicle') ? document.getElementById('filterVehicle').value : 'ALL';
+      const dateFrom = document.getElementById('filterDateFrom') ? document.getElementById('filterDateFrom').value : '';
+      const dateTo = document.getElementById('filterDateTo') ? document.getElementById('filterDateTo').value : '';
+
+      // Filtrujemy wydatki
+      let targetExpenses = globalExpenses;
+      if (selectedFilter !== 'ALL') {
+        targetExpenses = targetExpenses.filter(e => e.vehicle.includes(selectedFilter));
+      }
+      if (dateFrom) targetExpenses = targetExpenses.filter(e => e.date >= dateFrom);
+      if (dateTo) targetExpenses = targetExpenses.filter(e => e.date <= dateTo);
+
       let totalPLN = 0;
       let totalEUR = 0;
-      globalExpenses.forEach(e => {
+      targetExpenses.forEach(e => {
         if (e.currency === 'EUR') totalEUR += e.amount;
         else totalPLN += e.amount;
       });
@@ -483,31 +465,39 @@
       const eurInPln = totalEUR * rate;
       const grandTotalPLN = totalPLN + eurInPln;
 
+      const filterTitle = selectedFilter === 'ALL' ? 'Koszty Całkowite Floty' : `Koszty dla: ${selectedFilter}`;
+
       const staticCards = `
         <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (PLN)</p>
-          <p id="kpiTotalPLN" class="text-2xl font-black text-slate-900 dark:text-white mt-1">${totalPLN.toFixed(2)} PLN</p>
+          <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">${filterTitle} (PLN)</p>
+          <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">${totalPLN.toFixed(2)} PLN</p>
           <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs">
             <span class="text-slate-500 dark:text-slate-400">Razem z EUR:</span>
-            <span id="kpiTotalConvertedPLN" class="font-bold text-emerald-600 dark:text-emerald-400">${grandTotalPLN.toFixed(2)} PLN</span>
+            <span class="font-bold text-emerald-600 dark:text-emerald-400">${grandTotalPLN.toFixed(2)} PLN</span>
           </div>
         </div>
 
         <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
           <div class="flex justify-between items-start">
-            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Koszty Całkowite (EUR)</p>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">${filterTitle} (EUR)</p>
             <div class="flex items-center gap-1 no-print">
               <span class="text-[10px] text-slate-400 font-medium">Kurs:</span>
               <input type="number" id="eurRate" step="0.01" value="${rate}" onchange="processData()" class="w-14 p-1 text-xs border dark:border-slate-600 rounded font-bold text-blue-600 dark:bg-slate-700 dark:text-blue-400 text-center">
             </div>
           </div>
-          <p id="kpiTotalEUR" class="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">${totalEUR.toFixed(2)} EUR</p>
-          <span id="kpiEurInPlnDetails" class="text-xs text-slate-500 dark:text-slate-400 mt-1 block">= ${eurInPln.toFixed(2)} PLN (kurs ${rate})</span>
+          <p class="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">${totalEUR.toFixed(2)} EUR</p>
+          <span class="text-xs text-slate-500 dark:text-slate-400 mt-1 block">= ${eurInPln.toFixed(2)} PLN (kurs ${rate})</span>
         </div>
       `;
 
-      const vehicleCards = fleetVehicles.map(v => {
-        const stats = getVehicleStats(v);
+      // Karty poszczególnych aut (jeśli wybrano "Wszystkie", pokaże wszystkie auta; jeśli konkretne - pokaże tylko kartę tego auta)
+      let displayedVehicles = fleetVehicles;
+      if (selectedFilter !== 'ALL') {
+        displayedVehicles = fleetVehicles.filter(v => v.registration === selectedFilter);
+      }
+
+      const vehicleCards = displayedVehicles.map(v => {
+        const stats = getVehicleStats(v, targetExpenses);
         
         let alertClass = "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800";
         let alertBadge = "";
@@ -546,9 +536,9 @@
       container.innerHTML = staticCards + vehicleCards;
     }
 
-    function getVehicleStats(veh) {
+    function getVehicleStats(veh, expenseList) {
       const regNumber = veh.registration;
-      const vExpenses = globalExpenses.filter(e => e.vehicle.includes(regNumber));
+      const vExpenses = expenseList.filter(e => e.vehicle.includes(regNumber));
       
       const fuelEntries = vExpenses
         .filter(e => e.category === 'Paliwo' && e.liters && e.mileage)
@@ -600,7 +590,7 @@
           details = `Dystans: ${totalKm} km | Licznik: ${maxMileage} km`;
         }
       } else if (maxMileage > 0) {
-        details = `Licznik ostatni: ${maxMileage} km (Min. 2 tankowania do wyliczeń)`;
+        details = `Licznik ostatni: ${maxMileage} km (Min. 2 tankowania)`;
       }
 
       return { avgFuel, costPerKm, details, serviceNeeded };
@@ -616,6 +606,21 @@
 
       if (dateFrom) filtered = filtered.filter(e => e.date >= dateFrom);
       if (dateTo) filtered = filtered.filter(e => e.date <= dateTo);
+
+      // Aktualizacja dolnego paska podsumowania tabeli
+      let totalLiters = 0;
+      let totalCostPLN = 0;
+      const rate = parseFloat(document.getElementById('eurRate') ? document.getElementById('eurRate').value : 4.25) || 4.25;
+
+      filtered.forEach(e => {
+        if (e.liters) totalLiters += e.liters;
+        if (e.currency === 'EUR') totalCostPLN += (e.amount * rate);
+        else totalCostPLN += e.amount;
+      });
+
+      document.getElementById('filteredCount').innerText = `Liczba wpisów: ${filtered.length}`;
+      document.getElementById('filteredLiters').innerText = `Suma litrów: ${totalLiters.toFixed(2)} L`;
+      document.getElementById('filteredTotalCost').innerText = `Suma: ${totalCostPLN.toFixed(2)} PLN`;
 
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-400">Brak danych dla wybranych filtrów.</td></tr>';
@@ -641,13 +646,72 @@
               <span class="text-xs text-slate-300">—</span>
             `)}
           </td>
-          <td class="p-4 text-center no-print">
-            <button type="button" onclick="deleteExpense(${e.id})" class="text-red-500 hover:text-red-700 font-bold px-2 py-1 text-xs">
+          <td class="p-4 text-center no-print flex justify-center items-center gap-1">
+            <button type="button" onclick="openEditExpenseModal(${e.id})" title="Edytuj wydatek" class="text-blue-600 hover:text-blue-800 font-bold p-1 text-xs bg-blue-50 dark:bg-slate-700 rounded hover:bg-blue-100 transition-colors">
+              ✏️
+            </button>
+            <button type="button" onclick="deleteExpense(${e.id})" title="Usuń wydatek" class="text-red-500 hover:text-red-700 font-bold p-1 text-xs bg-red-50 dark:bg-slate-700 rounded hover:bg-red-100 transition-colors">
               🗑️
             </button>
           </td>
         </tr>
       `).join('');
+    }
+
+    // FUNKCJE EDYCJI WYDATKU
+    function openEditExpenseModal(id) {
+      const exp = globalExpenses.find(e => e.id === id);
+      if (!exp) return;
+
+      document.getElementById('editExpenseId').value = exp.id;
+      document.getElementById('editVehicle').value = exp.vehicle;
+      document.getElementById('editCategory').value = exp.category;
+      document.getElementById('editDate').value = exp.date;
+      document.getElementById('editLiters').value = exp.liters || '';
+      document.getElementById('editMileage').value = exp.mileage || '';
+      document.getElementById('editAmount').value = exp.amount;
+      document.getElementById('editCurrency').value = exp.currency;
+
+      document.getElementById('editExpenseModal').classList.remove('hidden');
+    }
+
+    function closeEditExpenseModal() {
+      document.getElementById('editExpenseModal').classList.add('hidden');
+      document.getElementById('editExpenseForm').reset();
+    }
+
+    function saveEditedExpense(e) {
+      e.preventDefault();
+      const id = parseFloat(document.getElementById('editExpenseId').value);
+      const index = globalExpenses.findIndex(exp => exp.id === id);
+
+      if (index === -1) return;
+
+      globalExpenses[index].vehicle = document.getElementById('editVehicle').value;
+      globalExpenses[index].category = document.getElementById('editCategory').value;
+      globalExpenses[index].date = document.getElementById('editDate').value;
+      globalExpenses[index].liters = parseFloat(document.getElementById('editLiters').value) || null;
+      globalExpenses[index].mileage = parseInt(document.getElementById('editMileage').value) || null;
+      globalExpenses[index].amount = parseFloat(document.getElementById('editAmount').value) || 0;
+      globalExpenses[index].currency = document.getElementById('editCurrency').value;
+
+      // Zapisujemy zaktualizowaną tablicę do localStorage
+      const localExpenses = globalExpenses.map(item => ({
+        id: item.id,
+        date: item.date,
+        vehicle: item.vehicle,
+        category: item.category,
+        amount_gross: item.amount,
+        currency: item.currency,
+        fuel_liters: item.liters,
+        mileage: item.mileage,
+        photo: item.photo
+      }));
+
+      localStorage.setItem('fleet_expenses', JSON.stringify(localExpenses));
+
+      closeEditExpenseModal();
+      processData();
     }
 
     function deleteExpense(id) {
@@ -669,6 +733,84 @@
       processData();
     }
 
+    function exportBackupJSON() {
+      const backupData = {
+        vehicles: fleetVehicles,
+        expenses: JSON.parse(localStorage.getItem('fleet_expenses') || '[]'),
+        exportDate: new Date().toISOString()
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `FleetLog_Kopia_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importBackupJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.expenses && Array.isArray(imported.expenses)) {
+            localStorage.setItem('fleet_expenses', JSON.stringify(imported.expenses));
+          }
+          if (imported.vehicles && Array.isArray(imported.vehicles)) {
+            localStorage.setItem('fleet_vehicles', JSON.stringify(imported.vehicles));
+          }
+          alert("Kopia zapasowa została pomyślnie przywrócona!");
+          initVehicles();
+          loadFromLocalStorage();
+        } catch (err) {
+          alert("Nieprawidłowy plik kopii zapasowej JSON.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function handleCSVImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        
+        globalExpenses = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const cols = line.split(',').map(col => col.replace(/^"|"$/g, '').trim());
+
+          if (cols.length >= 5) {
+            globalExpenses.push({
+              id: Date.now() + i,
+              date: cols[0] || '',
+              vehicle: cols[1] || 'Inny',
+              category: cols[2] || '',
+              amount: parseFloat(cols[3]) || 0,
+              currency: cols[4] || 'PLN',
+              liters: parseFloat(cols[5]) || null,
+              mileage: parseInt(cols[6]) || null,
+              photo: null,
+              hasPhoto: cols[7] === 'TAK'
+            });
+          }
+        }
+
+        processData();
+      };
+      reader.readAsText(file);
+    }
+
     function openPhotoModal(base64Image) {
       if (!base64Image) return;
       document.getElementById('modalImage').src = base64Image;
@@ -684,6 +826,7 @@
       if (e.key === 'Escape') {
         closePhotoModal();
         closeAddVehicleModal();
+        closeEditExpenseModal();
       }
     });
 
